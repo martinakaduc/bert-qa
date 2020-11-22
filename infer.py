@@ -95,11 +95,13 @@ if use_tpu:
     # Create model
     with strategy.scope():
         model = create_model()
+
 elif len(tf.config.experimental.list_physical_devices('GPU')) > 1:
     strategy = tf.distribute.MirroredStrategy()
     # Create model
     with strategy.scope():
         model = create_model()
+        
 else:
     model = create_model()
 
