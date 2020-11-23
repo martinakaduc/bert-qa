@@ -168,11 +168,17 @@ def create_model():
     end_logits = layers.Dense(1, name="end_logit", use_bias=False)(embedding)
     end_logits = layers.Flatten()(end_logits)
 
-    # start_logits = layers.Dense(512, name="start_dense", activations="relu")(embedding)
+    # start_logits = layers.Dense(512, name="start_dense_0", activations="relu")(embedding)
+    # start_logits = layers.Dense(256, name="start_dense_1", activations="relu")(start_logits)
+    # start_logits = layers.Dropout(0.2)(start_logits)
+    # start_logits = layers.Dense(128, name="start_dense_2", activations="relu")(start_logits)
     # start_logits = layers.Dense(1, name="start_logit", use_bias=False)(start_logits)
     # start_logits = layers.Flatten()(start_logits)
     #
-    # end_logits = layers.Dense(512, name="end_dense", activations="relu")(embedding)
+    # end_logits = layers.Dense(512, name="end_dense_0", activations="relu")(embedding)
+    # end_logits = layers.Dense(256, name="end_dense_1", activations="relu")(end_logits)
+    # end_logits = layers.Dropout(0.2)(end_logits)
+    # end_logits = layers.Dense(128, name="end_dense_2", activations="relu")(end_logits)
     # end_logits = layers.Dense(1, name="end_logit", use_bias=False)(end_logits)
     # end_logits = layers.Flatten()(end_logits)
 

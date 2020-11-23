@@ -109,11 +109,21 @@ else:
 model.summary()
 
 def infer(context, question, threshold=0.1):
-    input_ids, token_type_ids, attention_mask, tokenized_context, _ = preprocess(context, question)
+    input_ids = []
+    token_type_ids = []
+    attention_mask = []
+    tokenized_context = []
 
-    res = model.predict([np.array([input_ids]),
-                         np.array([token_type_ids]),
-                         np.array([attention_mask])
+    for ctx, ques in zip(context, question):
+      ids, type_ids, mask, tk_ctx, _ = preprocess(ctx, ques)
+      input_ids.append(ids)
+      token_type_ids.append(type_ids)
+      attention_mask.append(mask)
+      tokenized_context.append(tk_ctx)
+
+    res = model.predict([np.array(input_ids),
+                         np.array(token_type_ids),
+                         np.array(attention_mask)
                          ])
 
     idy, idx, idz = np.where(np.array(res) > threshold)
@@ -139,8 +149,8 @@ def infer(context, question, threshold=0.1):
             if idx_s == idx_e and idx_s == 0:
                 answers.append(("", prob))
             else:
-                token_dec = tokenized_context.offsets[idx_s:idx_e+1]
-                str_dec = context[token_dec[0][0]:token_dec[-1][1]]
+                token_dec = tokenized_context[x].offsets[idx_s:idx_e+1]
+                str_dec = context[x][token_dec[0][0]:token_dec[-1][1]]
 
                 answers.append((str_dec, prob))
 
