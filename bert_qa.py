@@ -168,6 +168,14 @@ def create_model():
     end_logits = layers.Dense(1, name="end_logit", use_bias=False)(embedding)
     end_logits = layers.Flatten()(end_logits)
 
+    # start_logits = layers.Dense(512, name="start_dense", activations="relu")(embedding)
+    # start_logits = layers.Dense(1, name="start_logit", use_bias=False)(start_logits)
+    # start_logits = layers.Flatten()(start_logits)
+    #
+    # end_logits = layers.Dense(512, name="end_dense", activations="relu")(embedding)
+    # end_logits = layers.Dense(1, name="end_logit", use_bias=False)(end_logits)
+    # end_logits = layers.Flatten()(end_logits)
+
     start_probs = layers.Activation(keras.activations.softmax)(start_logits)
     end_probs = layers.Activation(keras.activations.softmax)(end_logits)
 
@@ -177,20 +185,25 @@ def create_model():
     )
     loss = keras.losses.SparseCategoricalCrossentropy(from_logits=False)
     optimizer = keras.optimizers.Adam(lr=5e-5)
+
     model.compile(optimizer=optimizer, loss=[loss, loss])
 
-    if os.path.exists("./ckpt/checkpoint"):
-        model.load_weights("./ckpt/checkpoint")
+    if os.path.exists("./ckpt/checkpoint.h5"):
+        model.load_weights("./ckpt/checkpoint.h5")
+
+    # checkpoint = tf.train.Checkpoint(optimizer=optimizer, model=model)
+    # localhost_save_option = tf.saved_model.SaveOptions(experimental_io_device="/job:localhost")
+    # model.load_weights('./ckpt', options=localhost_save_option)
 
     return model
 
-use_tpu = False
+use_tpu = True
 if use_tpu:
     # Create distribution strategy
     tpu = tf.distribute.cluster_resolver.TPUClusterResolver()
     tf.config.experimental_connect_to_cluster(tpu)
     tf.tpu.experimental.initialize_tpu_system(tpu)
-    strategy = tf.distribute.experimental.TPUStrategy(tpu)
+    strategy = tf.distribute.TPUStrategy(tpu)
 
     # Create model
     with strategy.scope():
@@ -261,7 +274,7 @@ class ExactMatch(keras.callbacks.Callback):
         print(f"\nepoch={epoch+1}, exact match score={acc:.2f}")
 
 model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-    filepath="./ckpt/checkpoint",
+    filepath="./checkpoint.h5",
     save_weights_only=True,
     monitor='loss',
     mode="min",
@@ -269,10 +282,15 @@ model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
 
 exact_match_callback = ExactMatch(x_eval, y_eval)
 
-model.fit(
-    x_train,
-    y_train,
-    epochs=100,  # For demonstration, 3 epochs are recommended
-    batch_size=8,
-    callbacks=[exact_match_callback, model_checkpoint_callback],
-)
+for _ in range(100):
+  model.fit(
+      x_train,
+      y_train,
+      epochs=20,  # For demonstration, 3 epochs are recommended
+      batch_size=128,
+      callbacks=[exact_match_callback],
+  )
+  model.save_weights('./ckpt/checkpoint.h5', overwrite=True)
+  # localhost_save_option = tf.saved_model.SaveOptions(experimental_io_device="/job:localhost")
+  # model.save('./ckpt', options=localhost_save_option)
+  # model = tf.keras.models.load_model(model_dir, options=localhost_save_option)

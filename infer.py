@@ -48,7 +48,7 @@ def preprocess(context, question):
         attention_mask = attention_mask[:max_len]
         token_type_ids = token_type_ids[:max_len]
 
-    return input_ids, token_type_ids, attention_mask
+    return input_ids, token_type_ids, attention_mask, tokenized_context, tokenized_question
 
 def create_model():
     ## BERT encoder
@@ -77,10 +77,11 @@ def create_model():
     )
     loss = keras.losses.SparseCategoricalCrossentropy(from_logits=False)
     optimizer = keras.optimizers.Adam(lr=5e-5)
+
     model.compile(optimizer=optimizer, loss=[loss, loss])
 
-    if os.path.exists("./ckpt/checkpoint"):
-        model.load_weights("./ckpt/checkpoint")
+    if os.path.exists("./ckpt/checkpoint.h5"):
+        model.load_weights("./ckpt/checkpoint.h5")
 
     return model
 
@@ -90,7 +91,7 @@ if use_tpu:
     tpu = tf.distribute.cluster_resolver.TPUClusterResolver()
     tf.config.experimental_connect_to_cluster(tpu)
     tf.tpu.experimental.initialize_tpu_system(tpu)
-    strategy = tf.distribute.experimental.TPUStrategy(tpu)
+    strategy = tf.distribute.TPUStrategy(tpu)
 
     # Create model
     with strategy.scope():
@@ -101,16 +102,19 @@ elif len(tf.config.experimental.list_physical_devices('GPU')) > 1:
     # Create model
     with strategy.scope():
         model = create_model()
-        
+
 else:
     model = create_model()
 
 model.summary()
 
 def infer(context, question, threshold=0.1):
-    input_ids, token_type_ids, attention_mask = preprocess(context, question)
+    input_ids, token_type_ids, attention_mask, tokenized_context, _ = preprocess(context, question)
 
-    res = model.predict([[input_ids], [token_type_ids], [attention_mask]])
+    res = model.predict([np.array([input_ids]),
+                         np.array([token_type_ids]),
+                         np.array([attention_mask])
+                         ])
 
     idy, idx, idz = np.where(np.array(res) > threshold)
     index = np.array([idx, idy, idz])
@@ -126,7 +130,8 @@ def infer(context, question, threshold=0.1):
 
         answers = []
         for pair in zip(list_start, list_end):
-            idx_s, idx_e = index[2][pair[0]], index[2][pair[1]]
+            idx_s = index[2][pair[0]]
+            idx_e = index[2][pair[1]]
             prob_s = res[index[1][pair[0]]][index[0][pair[0]]][index[2][pair[0]]]
             prob_e = res[index[1][pair[1]]][index[0][pair[1]]][index[2][pair[1]]]
             prob = (prob_s + prob_e) / 2
@@ -134,7 +139,9 @@ def infer(context, question, threshold=0.1):
             if idx_s == idx_e and idx_s == 0:
                 answers.append(("", prob))
             else:
-                str_dec = tokenizer.decode(input_ids[idx_s:idx_e+1])
+                token_dec = tokenized_context.offsets[idx_s:idx_e+1]
+                str_dec = context[token_dec[0][0]:token_dec[-1][1]]
+
                 answers.append((str_dec, prob))
 
         list_answer.append(answers)
